@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cashflow & Expense Register — สมุดบันทึกรายรับ-รายจ่าย</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', 'Sarabun', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-sm">
+          CF
+        </div>
+        <div>
+          <h1 class="text-base font-semibold text-slate-900 leading-tight">Cashflow & Expense Register</h1>
+          <p class="text-xs text-slate-500">สมุดบันทึกรายรับ-รายจ่าย & กระทบยอดสเตทเมนต์</p>
+        </div>
+      </div>
+
+      <!-- View Switcher Tabs -->
+      <nav class="flex items-center bg-slate-100 p-1 rounded-xl text-xs sm:text-sm font-medium">
+        <button id="tabBtnRegister" class="px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm transition-all">
+          1. Transaction Register
+        </button>
+        <button id="tabBtnSummary" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all">
+          2. Monthly Summary
+        </button>
+        <button id="tabBtnValidation" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1.5">
+          <span>3. Reconciliation</span>
+          <span id="validationBadge" class="px-1.5 py-0.5 text-[10px] rounded-full bg-amber-100 text-amber-800 font-semibold hidden">0</span>
+        </button>
+        <button id="tabBtnCondo" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1.5">
+          <span>4. ผ่อนคอนโด (Condo)</span>
+        </button>
+      </nav>
+
+      <!-- Action Toolbar -->
+      <div class="flex items-center gap-2">
+        <button id="btnOpenImportModal" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-xs font-medium text-white transition flex items-center gap-1.5 shadow-sm">
+          <span>+ วางสเตทเมนต์ (Paste Statement)</span>
+        </button>
+        <button id="btnExportCsv" class="hidden sm:flex px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 transition items-center gap-1.5 shadow-sm">
+          <span>Export CSV</span>
+        </button>
+        <button id="btnResetDemo" class="hidden md:inline-flex px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-600 transition">
+          Reset Demo Data
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- KPI Summary Cards (SummaryAggregates) -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium uppercase tracking-wider text-slate-400">Total Balance (คงเหลือสุทธิ)</span>
+          <span id="reconStatusPill" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Reconciled</span>
+        </div>
+        <div class="mt-3">
+          <div id="kpiTotalBalance" class="text-2xl font-bold text-slate-900 tracking-tight">฿0.00</div>
+          <p class="text-xs text-slate-500 mt-1 flex items-center justify-between">
+            <span>Opening: <strong id="kpiOpeningDisplay" class="font-medium text-slate-700">฿50,000.00</strong></span>
+            <button id="btnEditOpening" class="text-indigo-600 hover:underline text-[11px]">แก้ไขยอดยกมา</button>
+          </p>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium uppercase tracking-wider text-slate-400">Total Income (รายรับรวม)</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        </div>
+        <div class="mt-3">
+          <div id="kpiTotalIncome" class="text-2xl font-bold text-emerald-600 tracking-tight">฿0.00</div>
+          <p id="kpiIncomeCount" class="text-xs text-slate-500 mt-1">0 รายการฝากเข้า</p>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium uppercase tracking-wider text-slate-400">Total Expense (รายจ่ายรวม)</span>
+          <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+        </div>
+        <div class="mt-3">
+          <div id="kpiTotalExpense" class="text-2xl font-bold text-rose-600 tracking-tight">฿0.00</div>
+          <p id="kpiExpenseCount" class="text-xs text-slate-500 mt-1">0 รายการถอนออก</p>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium uppercase tracking-wider text-slate-400">Net Cash Flow (กระแสเงินสดสุทธิ)</span>
+          <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+        </div>
+        <div class="mt-3">
+          <div id="kpiNetCashflow" class="text-2xl font-bold text-slate-900 tracking-tight">฿0.00</div>
+          <p id="kpiTransferCount" class="text-xs text-slate-500 mt-1">โอนย้ายภายใน: 0 รายการ (฿0.00)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 1: TRANSACTION REGISTER -->
+    <section id="viewRegister" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- Left Form: Add Transaction -->
+        <div class="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+          <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-900">เพิ่มรายการเดินบัญชี (Add Entry)</h2>
+              <p class="text-xs text-slate-500">บันทึกตามบรรทัดสเตทเมนต์หรือสลิปโอนเงิน</p>
+            </div>
+            <span class="text-[11px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">LocalStorage</span>
+          </div>
+
+          <form id="txnForm" class="space-y-3.5">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">วันที่ (Date) *</label>
+                <input type="date" id="inputDate" required class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">เวลา (Time) *</label>
+                <input type="time" id="inputTime" required value="09:30" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">ประเภท (Type) *</label>
+                <select id="inputType" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
+                  <option value="income">รายรับ (Income)</option>
+                  <option value="expense" selected>รายจ่าย (Expense)</option>
+                  <option value="transfer">โอนย้ายภายใน (Transfer)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">จำนวนเงิน (Amount) *</label>
+                <input type="number" id="inputAmount" step="0.01" min="0.01" placeholder="0.00" required class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">หมวดหมู่หลัก (Category) *</label>
+                <select id="inputCategory" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900">
+                  <option value="ต้นทุนสินค้า/บริการ">ต้นทุนสินค้า/บริการ</option>
+                  <option value="ชำระค่างวดคอนโด">ชำระค่างวดคอนโด (Mortgage)</option>
+                  <option value="ค่าใช้จ่ายดำเนินงาน">ค่าใช้จ่ายดำเนินงาน</option>
+                  <option value="ค่าสาธารณูปโภค">ค่าสาธารณูปโภค (น้ำ-ไฟ-เน็ต)</option>
+                  <option value="เงินเดือนและค่าจ้าง">เงินเดือนและค่าจ้าง</option>
+                  <option value="ค่าธรรมเนียมธนาคาร">ค่าธรรมเนียมธนาคาร</option>
+                  <option value="ภาษี">ภาษี (Tax)</option>
+                  <option value="รายได้จากการขาย/บริการ">รายได้จากการขาย/บริการ</option>
+                  <option value="รายได้ดอกเบี้ย">รายได้ดอกเบี้ย</option>
+                  <option value="เงินคืน/เงินชดเชย">เงินคืน/เงินชดเชย</option>
+                  <option value="โอนย้ายระหว่างบัญชี">โอนย้ายระหว่างบัญชีตนเอง</option>
+                  <option value="รอระบุหมวดหมู่">รอระบุหมวดหมู่ (Flag Validation)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">หมวดหมู่ย่อย (Sub-Cat)</label>
+                <input type="text" id="inputSubCategory" placeholder="เช่น ค่าเช่า, ค่าไฟ, QR" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">ธนาคาร/บัญชี (Account)</label>
+                <input type="text" id="inputBank" value="KBANK-4821" placeholder="KBANK-1234" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">รหัส/เลขอ้างอิง (Ref/Code)</label>
+                <input type="text" id="inputRef" placeholder="เช่น X1, TR-9012" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">รายละเอียด / ผู้รับ-ผู้โอน (Description / Counterparty) *</label>
+              <input type="text" id="inputDesc" required placeholder="คัดลอกคำอธิบายจากสเตทเมนต์หรือชื่อผู้รับ/ผู้โอน" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">ยอดคงเหลือตามเอกสาร (Stmt Bal)</label>
+                <input type="number" id="inputStmtBal" step="0.01" placeholder="เว้นว่าง = คำนวณอัตโนมัติ" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">ไฟล์อ้างอิง (Source File)</label>
+                <input type="text" id="inputSource" value="KBANK_Stmt_Oct2026.pdf หน้า 1" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">หมายเหตุ (Note)</label>
+              <input type="text" id="inputNote" placeholder="บันทึกเพิ่มเติม (ถ้ามี)" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            </div>
+
+            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs transition shadow-sm">
+              + บันทึกรายการ (Save Transaction)
+            </button>
+          </form>
+        </div>
+
+        <!-- Right Table: 15-Column Standard Register -->
+        <div class="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col">
+          <!-- Filter Bar -->
+          <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+              <input type="text" id="filterSearch" placeholder="ค้นหารายละเอียด, เลขอ้างอิง, หมวดหมู่..." class="w-full max-w-xs rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              <select id="filterType" class="rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 bg-white">
+                <option value="all">ทุกประเภท (All Types)</option>
+                <option value="uncategorized">⚠️ รอระบุที่มา/ใช้ทำอะไร (Uncategorized)</option>
+                <option value="income">รายรับ (Income)</option>
+                <option value="expense">รายจ่าย (Expense)</option>
+                <option value="transfer">โอนย้าย (Transfer)</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-slate-500">
+              <span id="registerCountLabel">แสดง 0 รายการ</span>
+            </div>
+          </div>
+
+          <!-- Table Wrapper -->
+          <div class="overflow-x-auto custom-scrollbar">
+            <table class="w-full text-left border-collapse min-w-[960px]">
+              <thead>
+                <tr class="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <th class="py-3 px-3">No.</th>
+                  <th class="py-3 px-3">Date / Time</th>
+                  <th class="py-3 px-3">Bank / Ref</th>
+                  <th class="py-3 px-3">Description / Counterparty</th>
+                  <th class="py-3 px-3">Type</th>
+                  <th class="py-3 px-3">Category</th>
+                  <th class="py-3 px-3 text-right">Income (+)</th>
+                  <th class="py-3 px-3 text-right">Expense (-)</th>
+                  <th class="py-3 px-3 text-right">Running Bal.</th>
+                  <th class="py-3 px-3">Source / Note</th>
+                  <th class="py-3 px-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="registerTableBody" class="divide-y divide-slate-100 text-xs">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- VIEW 2: MONTHLY SUMMARY & CHARTS -->
+    <section id="viewSummary" class="space-y-6 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-7 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          <h3 class="text-sm font-semibold text-slate-900 mb-1">สรุปรายรับ-รายจ่ายแยกตามหมวดหมู่ (Category Breakdown)</h3>
+          <p class="text-xs text-slate-500 mb-4">ไม่นับรวมรายการโอนย้ายระหว่างบัญชีตนเอง (Internal Transfers Excluded)</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase">
+                  <th class="py-2.5 px-3">หมวดหมู่ (Category)</th>
+                  <th class="py-2.5 px-3">ประเภท</th>
+                  <th class="py-2.5 px-3 text-right">จำนวนรายการ</th>
+                  <th class="py-2.5 px-3 text-right">ยอดรวม (THB)</th>
+                  <th class="py-2.5 px-3 text-right">สัดส่วน (%)</th>
+                </tr>
+              </thead>
+              <tbody id="categorySummaryBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-900 mb-1">กราฟเปรียบเทียบหมวดหมู่ (Visual Analytics)</h3>
+            <p class="text-xs text-slate-500 mb-4">สัดส่วนรายรับและรายจ่ายตามหมวดหมู่หลัก</p>
+          </div>
+          <div class="relative h-72 w-full">
+            <canvas id="summaryChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: VALIDATION & RECONCILIATION -->
+    <section id="viewValidation" class="space-y-6 hidden">
+      <!-- Period Reconciliation Formula Check -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+        <h3 class="text-sm font-semibold text-slate-900 mb-1">การกระทบยอดรวมประจำงวด (Period Reconciliation Check)</h3>
+        <p class="text-xs text-slate-500 mb-4">สูตรตรวจสอบ: ยอดยกมาต้นงวด + รายรับรวม - รายจ่ายรวม (รวมโอนออกสุทธิ) = ยอดคงเหลือยกไปสิ้นงวด</p>
+        <div id="reconFormulaCards" class="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Validation Table -->
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-900">รายการตรวจสอบความถูกต้อง (Validation & Audit Log)</h3>
+            <p class="text-xs text-slate-500">ตรวจสอบ Running Balance, รายการรอระบุหมวดหมู่ และคำอธิบายที่ไม่ชัดเจน</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left border-collapse min-w-[850px] text-xs">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase">
+                <th class="py-2.5 px-3">No.</th>
+                <th class="py-2.5 px-3">Date</th>
+                <th class="py-2.5 px-3">Source File</th>
+                <th class="py-2.5 px-3">Ref / Description</th>
+                <th class="py-2.5 px-3 text-right">Stmt Balance</th>
+                <th class="py-2.5 px-3 text-right">Expected Calc</th>
+                <th class="py-2.5 px-3 text-right">Diff</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-3">Confidence</th>
+                <th class="py-2.5 px-3">Audit Remark</th>
+              </tr>
+            </thead>
+            <tbody id="validationTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: CONDO MORTGAGE TRACKER (อัพเดทการผ่อนคอนโด) -->
+    <section id="viewCondo" class="space-y-6 hidden">
+
+      <!-- Condo KPI Summary Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wider text-slate-400">ยอดหนี้เงินต้นคงเหลือ</span>
+            <span id="condoProgressBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">ชำระแล้ว 0%</span>
+          </div>
+          <div class="mt-3">
+            <div id="condoKpiRemaining" class="text-2xl font-bold text-slate-900 tracking-tight">฿0.00</div>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div id="condoProgressBar" class="bg-indigo-600 h-full rounded-full transition-all" style="width: 0%"></div>
+            </div>
+            <p id="condoKpiOriginalLoan" class="text-xs text-slate-500 mt-1.5">วงเงินกู้เริ่มต้น: ฿2,500,000.00</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wider text-slate-400">ยอดที่จ่ายไปแล้วทั้งหมด</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          </div>
+          <div class="mt-3">
+            <div id="condoKpiTotalPaid" class="text-2xl font-bold text-slate-900 tracking-tight">฿0.00</div>
+            <p class="text-xs text-slate-500 mt-1">
+              ตัดเงินต้นสะสม: <strong id="condoKpiPrincipalPaid" class="text-emerald-600 font-semibold">฿0.00</strong>
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wider text-slate-400">ดอกเบี้ยสะสมที่จ่ายแล้ว</span>
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+          </div>
+          <div class="mt-3">
+            <div id="condoKpiInterestPaid" class="text-2xl font-bold text-rose-600 tracking-tight">฿0.00</div>
+            <p id="condoKpiNextInterestEst" class="text-xs text-slate-500 mt-1">ดอกเบี้ยงวดถัดไป (ประมาณ): ฿0.00</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium uppercase tracking-wider text-slate-400">คาดการณ์ผ่อนหมด & รีไฟแนนซ์</span>
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          </div>
+          <div class="mt-3">
+            <div id="condoKpiPayoffEst" class="text-xl font-bold text-slate-900 tracking-tight">- ปี - เดือน</div>
+            <p id="condoKpiRefinanceInfo" class="text-xs text-slate-500 mt-1">ส่งแล้ว 0 งวด | ครบ 3 ปี (36 งวด)</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Condo Content Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- Left Column: Loan Parameters & Add Payment Form -->
+        <div class="lg:col-span-4 space-y-6">
+
+          <!-- Card 1: ตั้งค่าสัญญาเงินกู้คอนโด -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 class="text-sm font-semibold text-slate-900">ข้อมูลสัญญาสินเชื่อคอนโด (Loan Setup)</h3>
+                <p class="text-xs text-slate-500">ใช้คำนวณดอกเบี้ยลดต้นลดดอก (Effective Rate)</p>
+              </div>
+              <span class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-700">ลดต้นลดดอก</span>
+            </div>
+
+            <form id="condoConfigForm" class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">ชื่อโครงการ / ห้องชุด & ธนาคาร</label>
+                <input type="text" id="condoInputName" value="Ideo Sukhumvit (KBANK Home Loan)" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">วงเงินกู้เริ่มต้น (บาท)</label>
+                  <input type="number" id="condoInputPrincipal" step="1000" min="10000" value="2500000" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">อัตราดอกเบี้ยต่อปี (%)</label>
+                  <input type="number" id="condoInputRate" step="0.01" min="0.1" max="25" value="3.45" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">ค่างวดตามสัญญา/เดือน</label>
+                  <input type="number" id="condoInputMonthlyPmt" step="100" min="500" value="12500" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">โปะเพิ่มเฉลี่ย/เดือน (จำลอง)</label>
+                  <input type="number" id="condoInputExtraSim" step="500" min="0" value="2000" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-emerald-700 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">ระยะเวลากู้ตามสัญญา (ปี)</label>
+                  <input type="number" id="condoInputTenureYears" step="1" min="1" max="40" value="30" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">วันเริ่มสัญญา</label>
+                  <input type="date" id="condoInputStartDate" value="2026-07-01" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" />
+                </div>
+              </div>
+
+              <button type="submit" class="w-full py-2 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs transition shadow-sm">
+                บันทึกการตั้งค่าสัญญา & คำนวณใหม่
+              </button>
+            </form>
+          </div>
+
+          <!-- Card 2: บันทึกการจ่ายค่างวด / โปะคอนโดรายเดือน -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+            <div class="border-b border-slate-100 pb-3">
+              <h3 class="text-sm font-semibold text-slate-900">อัพเดทการจ่ายค่างวด / โปะเพิ่ม (Log Payment)</h3>
+              <p class="text-xs text-slate-500">คำนวณดอกเบี้ยรายวันตามจำนวนวันจริง (Actual/365)</p>
+            </div>
+
+            <form id="condoPayForm" class="space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">วันที่ชำระ *</label>
+                  <input type="date" id="condoPayDate" required value="2026-10-25" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">จำนวนวันคิดดอกเบี้ย</label>
+                  <input type="number" id="condoPayDays" value="30" min="0" max="366" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">ค่างวดปกติ (บาท) *</label>
+                  <input type="number" id="condoPayRegular" step="0.01" min="0" required value="12500" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">จ่ายโปะเพิ่มตัดต้น (บาท)</label>
+                  <input type="number" id="condoPayExtra" step="0.01" min="0" value="0" placeholder="0.00" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">ดอกเบี้ยตามใบเสร็จ (บาท)</label>
+                  <input type="number" id="condoPayCustomInterest" step="0.01" placeholder="เว้นว่าง = คำนวณอัตโนมัติ" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">อัตราดอกเบี้ยงวดนี้ (%)</label>
+                  <input type="number" id="condoPayRate" step="0.01" value="3.45" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">หมายเหตุ / เลขที่ใบเสร็จ</label>
+                <input type="text" id="condoPayNote" placeholder="เช่น งวด ต.ค. 69 + โปะเพิ่มพิเศษ" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+              </div>
+
+              <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer pt-1">
+                <input type="checkbox" id="condoSyncToRegister" checked class="rounded border-slate-300 text-indigo-600" />
+                <span>บันทึกลงตารางรายจ่าย (Tab 1: Transaction Register) ด้วยอัตโนมัติ</span>
+              </label>
+
+              <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs transition shadow-sm">
+                + บันทึกงวดผ่อนคอนโด (Record Condo Payment)
+              </button>
+            </form>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Payoff Simulator Banner, Chart, and Payment History Table -->
+        <div class="lg:col-span-8 space-y-6">
+
+          <!-- Payoff & Interest Saving Comparison Banner -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <h3 class="text-sm font-semibold text-slate-900">วิเคราะห์ความคุ้มค่าของการโปะคอนโด & กราฟสัดส่วนตัดต้น vs ดอกเบี้ย</h3>
+                <p id="condoHeaderTitle" class="text-xs text-slate-500">โครงการ: Ideo Sukhumvit (KBANK Home Loan)</p>
+              </div>
+              <span id="condoInterestSavedBadge" class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+                ประหยัดดอกเบี้ยจากโปะเพิ่ม: ฿0.00
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+              <div class="md:col-span-5 space-y-2.5 text-xs">
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <div class="text-slate-500">กรณีผ่อนตามสัญญาปกติ (ไม่โปะเพิ่ม)</div>
+                  <div id="simNormalSummary" class="font-semibold text-slate-900 mt-0.5">ใช้เวลา - ปี | ดอกเบี้ยรวมในอนาคต ฿0.00</div>
+                </div>
+                <div class="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200">
+                  <div id="simExtraLabel" class="text-emerald-800">กรณีโปะเพิ่มเดือนละ +฿2,000.00</div>
+                  <div id="simExtraSummary" class="font-semibold text-emerald-900 mt-0.5">ใช้เวลา - ปี | ดอกเบี้ยรวมในอนาคต ฿0.00</div>
+                </div>
+                <div class="p-3 rounded-xl bg-indigo-50/60 border border-indigo-200">
+                  <div class="text-indigo-800">สูตรคำนวณดอกเบี้ยธนาคาร (ลดต้นลดดอก)</div>
+                  <div class="font-mono text-[11px] text-indigo-900 mt-0.5">ดอกเบี้ย = (เงินต้นคงเหลือ × %ต่อปี × จำนวนวัน) ÷ 365</div>
+                </div>
+              </div>
+
+              <div class="md:col-span-7 relative h-56 w-full">
+                <canvas id="condoChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Condo Amortization & Payment Ledger Table -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-semibold text-slate-900">ตารางประวัติการผ่อนชำระและตัดเงินต้นคอนโด (Condo Payment Ledger)</h3>
+                <p class="text-xs text-slate-500">แยกแสดงยอดจ่ายรวม ดอกเบี้ย ตัดเงินต้น ยอดโปะพิเศษ และเงินต้นคงเหลือทุกงวด</p>
+              </div>
+              <span id="condoTableCount" class="text-xs text-slate-500">0 งวด</span>
+            </div>
+
+            <div class="overflow-x-auto custom-scrollbar">
+              <table class="w-full text-left border-collapse min-w-[820px] text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500 uppercase">
+                    <th class="py-3 px-3">งวดที่</th>
+                    <th class="py-3 px-3">วันที่ชำระ</th>
+                    <th class="py-3 px-3 text-center">วัน</th>
+                    <th class="py-3 px-3 text-right">ดอกเบี้ย (%ปี)</th>
+                    <th class="py-3 px-3 text-right">ยอดจ่ายรวม</th>
+                    <th class="py-3 px-3 text-right text-rose-600">หักดอกเบี้ย</th>
+                    <th class="py-3 px-3 text-right text-emerald-700">ตัดเงินต้นสุทธิ</th>
+                    <th class="py-3 px-3 text-right text-indigo-700">(รวมโปะเพิ่ม)</th>
+                    <th class="py-3 px-3 text-right">เงินต้นคงเหลือ</th>
+                    <th class="py-3 px-3">หมายเหตุ</th>
+                    <th class="py-3 px-3 text-center">ลบ</th>
+                  </tr>
+                </thead>
+                <tbody id="condoTableBody" class="divide-y divide-slate-100">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal for Editing Opening Balance -->
+  <div id="modalOpening" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full p-5 space-y-4">
+      <h3 class="text-sm font-semibold text-slate-900">ตั้งค่ายอดคงเหลือยกมาต้นงวด (Opening Balance)</h3>
+      <p class="text-xs text-slate-500">ระบุยอดยกมาจากสเตทเมนต์บรรทัดแรก เพื่อใช้คำนวณ Running Balance</p>
+      <input type="number" id="modalOpeningInput" step="0.01" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-slate-900" />
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="btnCancelOpening" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50">ยกเลิก</button>
+        <button id="btnSaveOpening" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-800">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Pasting Bank Statement Text / CSV -->
+  <div id="modalImportStmt" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-2xl w-full p-6 space-y-4">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h3 class="text-base font-semibold text-slate-900">วางข้อมูลสเตทเมนต์ธนาคาร (Paste Bank Statement)</h3>
+          <p class="text-xs text-slate-500 mt-0.5">ก๊อปปี้ข้อความจาก PDF สเตทเมนต์ / Excel / CSV มาวางได้เลย ระบบจะดึงวันที่ เวลา ยอดเงิน และยอดคงเหลือให้อัตโนมัติ แล้วตั้งสถานะเป็น <span class="text-amber-700 font-medium">"รอระบุหมวดหมู่"</span> เพื่อให้คุณกรอกต่อในตารางว่าเงินมาจากไหนหรือใช้ทำอะไร</p>
+        </div>
+        <button id="btnLoadSampleStmt" type="button" class="shrink-0 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-medium transition">
+          ลองโหลดตัวอย่างสเตทเมนต์
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">ธนาคาร / บัญชีของสเตทเมนต์นี้</label>
+          <input type="text" id="importBankAccount" value="KBANK-4821" placeholder="เช่น KBANK-4821, SCB-9012" class="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-900" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">ชื่อไฟล์อ้างอิง (Source File)</label>
+          <input type="text" id="importSourceFile" value="Pasted_Statement_Oct2026.pdf" class="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs text-slate-900" />
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1">ข้อความจากสเตทเมนต์ (1 บรรทัดต่อ 1 รายการ)</label>
+        <textarea id="importRawText" rows="7" placeholder="ตัวอย่างรูปแบบที่รองรับ:&#10;10/10/2026 10:15 | TR-1029 | รับโอนเงินผ่าน QR PromptPay | +2,500.00 | 71,400.00&#10;12/10/2026 13:40 | POS-8841 | ชำระค่าสินค้า/บริการ | -650.00 | 70,750.00&#10;15/10/2026 18:05 | X1-9930 | โอนเงินออกผ่าน K PLUS | -1,200.00 | 69,550.00" class="w-full rounded-xl border border-slate-200 p-3 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"></textarea>
+        <p id="importPreviewHint" class="text-[11px] text-slate-500 mt-1">รองรับรูปแบบคั่นด้วยเครื่องหมาย | , แท็บ (Tab จาก Excel) หรือเว้นวรรคจากสเตทเมนต์ทั่วไป</p>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+        <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+          <input type="checkbox" id="importClearExisting" class="rounded border-slate-300 text-indigo-600" />
+          <span>ล้างรายการเดิมก่อนนำเข้า (Replace existing rows)</span>
+        </label>
+        <div class="flex gap-2">
+          <button id="btnCancelImport" type="button" class="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50">ยกเลิก</button>
+          <button id="btnConfirmImport" type="button" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 shadow-sm">ดึงข้อมูลเข้าตาราง (Extract Rows)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY_TXNS = 'cf_register_transactions_v1';
+    const STORAGE_KEY_OPENING = 'cf_register_opening_v1';
+    const STORAGE_KEY_CONDO_CFG = 'cf_condo_config_v1';
+    const STORAGE_KEY_CONDO_PMTS = 'cf_condo_payments_v1';
+
+    const DEFAULT_CONDO_CONFIG = {
+      propertyName: 'Ideo Sukhumvit (KBANK Home Loan)',
+      originalPrincipal: 2500000.00,
+      annualRate: 3.45,
+      monthlyInstallment: 12500.00,
+      extraMonthlySim: 2000.00,
+      tenureYears: 30,
+      startDate: '2026-07-01'
+    };
+
+    const DEFAULT_CONDO_PAYMENTS = [
+      {
+        id: 'cp-1',
+        date: '2026-07-25',
+        days: 30,
+        rate: 3.45,
+        regularAmount: 12500.00,
+        extraAmount: 0.00,
+        customInterest: null,
+        note: 'งวดที่ 1 (ก.ค. 69) หักบัญชีอัตโนมัติ'
+      },
+      {
+        id: 'cp-2',
+        date: '2026-08-25',
+        days: 31,
+        rate: 3.45,
+        regularAmount: 12500.00,
+        extraAmount: 2500.00,
+        customInterest: null,
+        note: 'งวดที่ 2 (ส.ค. 69) + โปะเพิ่มตัดต้น'
+      },
+      {
+        id: 'cp-3',
+        date: '2026-09-25',
+        days: 31,
+        rate: 3.45,
+        regularAmount: 12500.00,
+        extraAmount: 2500.00,
+        customInterest: null,
+        note: 'งวดที่ 3 (ก.ย. 69) + โปะเพิ่มตัดต้น'
+      },
+      {
+        id: 'cp-4',
+        date: '2026-10-25',
+        days: 30,
+        rate: 3.45,
+        regularAmount: 12500.00,
+        extraAmount: 5000.00,
+        customInterest: null,
+        note: 'งวดที่ 4 (ต.ค. 69) + โปะพิเศษจากโบนัส'
+      }
+    ];
+
+    const DEFAULT_OPENING_BALANCE = 50000.00;
+    const DEFAULT_TRANSACTIONS = [
+      {
+        id: 'txn-101',
+        date: '2026-10-01',
+        time: '09:15',
+        bankAccount: 'KBANK-4821',
+        referenceNo: 'X1-88210',
+        description: 'รับชำระค่าบริการพัฒนาซอฟต์แวร์ งวดที่ 1 - บจก. เอเพ็กซ์ โซลูชั่น',
+        type: 'income',
+        category: 'รายได้จากการขาย/บริการ',
+        subCategory: 'ค่าบริการโครงการ',
+        amount: 35000.00,
+        statementBalance: 85000.00,
+        channel: 'K PLUS / QR',
+        note: 'ใบเสร็จรับเงิน #INV-2026-101',
+        sourceFile: 'KBANK_Stmt_Oct2026.pdf หน้า 1'
+      },
+      {
+        id: 'txn-102',
+        date: '2026-10-03',
+        time: '14:22',
+        bankAccount: 'KBANK-4821',
+        referenceNo: 'POS-33109',
+        description: 'ชำระค่าเช่าเซิร์ฟเวอร์และคลาวด์รายเดือน AWS Cloud',
+        type: 'expense',
+        category: 'ค่าใช้จ่ายดำเนินงาน',
+        subCategory: 'Cloud & Hosting',
+        amount: 4250.00,
+        statementBalance: 80750.00,
+        channel: 'Debit Card',
+        note: 'ตัดบัตรอัตโนมัติ',
+        sourceFile: 'KBANK_Stmt_Oct2026.pdf หน้า 1'
+      },
+      {
+        id: 'txn-103',
+        date: '2026-10-05',
+        time: '11:05',
+        bankAccount: 'KBANK-4821',
+        referenceNo: 'TR-55012',
+        description: 'โอนเงินไปบัญชีออมทรัพย์ SCB-9012 (บัญชีตนเอง)',
+        type: 'transfer',
+        category: 'โอนย้ายระหว่างบัญชี',
+        subCategory: 'โอนออกภายใน',
+        amount: 10000.00,
+        statementBalance: 70750.00,
+        channel: 'Mobile Banking',
+        note: 'สำรองสภาพคล่องบัญชีรอง',
+        sourceFile: 'KBANK_Stmt_Oct2026.pdf หน้า 1'
+      },
+      {
+        id: 'txn-104',
+        date: '2026-10-08',
+        time: '18:40',
+        bankAccount: 'KBANK-4821',
+        referenceNo: 'ATS-10944',
+        description: 'รายการถอนผ่านระบบ ATS ไม่ระบุชื่อผู้รับ',
+        type: 'expense',
+        category: 'รอระบุหมวดหมู่',
+        subCategory: 'ไม่ระบุ',
+        amount: 1850.00,
+        statementBalance: 68900.00,
+        channel: 'ATS Direct Debit',
+        note: 'ต้องตรวจสอบใบแจ้งหนี้ประกอบ',
+        sourceFile: 'KBANK_Stmt_Oct2026.pdf หน้า 2'
+      }
+    ];
+
+    let transactions = [];
+    let openingBalance = DEFAULT_OPENING_BALANCE;
+    let condoConfig = { ...DEFAULT_CONDO_CONFIG };
+    let condoPayments = [];
+    let summaryChartInstance = null;
+    let condoChartInstance = null;
+
+    function loadData() {
+      try {
+        const rawTxns = localStorage.getItem(STORAGE_KEY_TXNS);
+        const rawOpen = localStorage.getItem(STORAGE_KEY_OPENING);
+        const rawCondoCfg = localStorage.getItem(STORAGE_KEY_CONDO_CFG);
+        const rawCondoPmts = localStorage.getItem(STORAGE_KEY_CONDO_PMTS);
+        transactions = rawTxns ? JSON.parse(rawTxns) : [...DEFAULT_TRANSACTIONS];
+        openingBalance = rawOpen !== null ? parseFloat(rawOpen) : DEFAULT_OPENING_BALANCE;
+        condoConfig = rawCondoCfg ? JSON.parse(rawCondoCfg) : { ...DEFAULT_CONDO_CONFIG };
+        condoPayments = rawCondoPmts ? JSON.parse(rawCondoPmts) : [...DEFAULT_CONDO_PAYMENTS];
+      } catch (e) {
+        transactions = [...DEFAULT_TRANSACTIONS];
+        openingBalance = DEFAULT_OPENING_BALANCE;
+        condoConfig = { ...DEFAULT_CONDO_CONFIG };
+        condoPayments = [...DEFAULT_CONDO_PAYMENTS];
+      }
+    }
+
+    function saveData() {
+      try {
+        localStorage.setItem(STORAGE_KEY_TXNS, JSON.stringify(transactions));
+        localStorage.setItem(STORAGE_KEY_OPENING, String(openingBalance));
+        localStorage.setItem(STORAGE_KEY_CONDO_CFG, JSON.stringify(condoConfig));
+        localStorage.setItem(STORAGE_KEY_CONDO_PMTS, JSON.stringify(condoPayments));
+      } catch (e) {
+        // Fallback for restricted storage
+      }
+    }
+
+    function formatCurrency(val) {
+      return '฿' + Number(val || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function formatDateTH(isoDate) {
+      if (!isoDate) return '-';
+      const parts = isoDate.split('-');
+      if (parts.length !== 3) return isoDate;
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    function computeEnrichedTransactions() {
+      const sorted = [...transactions].sort((a, b) => {
+        const dtA = `${a.date}T${a.time || '00:00'}`;
+        const dtB = `${b.date}T${b.time || '00:00'}`;
+        return dtA.localeCompare(dtB);
+      });
+
+      let running = openingBalance;
+      return sorted.map((t, idx) => {
+        const inc = t.type === 'income' ? Number(t.amount) : 0;
+        const exp = (t.type === 'expense' || t.type === 'transfer') ? Number(t.amount) : 0;
+        const expectedBal = Number((running + inc - exp).toFixed(2));
+        const actualBal = (t.statementBalance !== null && t.statementBalance !== undefined && t.statementBalance !== '')
+          ? Number(t.statementBalance)
+          : expectedBal;
+        const diff = Number((actualBal - expectedBal).toFixed(2));
+        running = actualBal;
+
+        let status = 'OK';
+        let confidence = 'สูง';
+        let remark = 'กระทบยอดถูกต้อง';
+
+        if (Math.abs(diff) >= 0.01) {
+          status = 'ยอดคงเหลือไม่ตรง';
+          confidence = 'ต่ำ';
+          remark = `ผลต่าง Running Balance ${diff > 0 ? '+' : ''}${diff.toFixed(2)} บาท`;
+        } else if (t.category === 'รอระบุหมวดหมู่') {
+          status = 'รอระบุหมวดหมู่';
+          confidence = 'กลาง';
+          remark = 'คำอธิบายสเตทเมนต์ไม่ระบุผู้รับ/ผู้โอนชัดเจน';
+        }
+
+        return {
+          ...t,
+          no: idx + 1,
+          incomeVal: inc,
+          expenseVal: exp,
+          expectedBalance: expectedBal,
+          runningBalance: actualBal,
+          diff,
+          status,
+          confidence,
+          remark
+        };
+      });
+    }
+
+    function renderAll() {
+      const enriched = computeEnrichedTransactions();
+
+      // Calculate SummaryAggregates
+      let totalIncome = 0;
+      let totalExpense = 0;
+      let totalTransfer = 0;
+      let incomeCount = 0;
+      let expenseCount = 0;
+      let transferCount = 0;
+
+      enriched.forEach(item => {
+        if (item.type === 'income') {
+          totalIncome += item.amount;
+          incomeCount++;
+        } else if (item.type === 'expense') {
+          totalExpense += item.amount;
+          expenseCount++;
+        } else if (item.type === 'transfer') {
+          totalTransfer += item.amount;
+          transferCount++;
+        }
+      });
+
+      const latestBalance = enriched.length > 0 ? enriched[enriched.length - 1].runningBalance : openingBalance;
+      const netCashFlow = totalIncome - totalExpense;
+      const flaggedItems = enriched.filter(i => i.status !== 'OK');
+
+      // Update Top KPI Cards
+      document.getElementById('kpiTotalBalance').textContent = formatCurrency(latestBalance);
+      document.getElementById('kpiOpeningDisplay').textContent = formatCurrency(openingBalance);
+      document.getElementById('kpiTotalIncome').textContent = formatCurrency(totalIncome);
+      document.getElementById('kpiIncomeCount').textContent = `${incomeCount} รายการฝากเข้า`;
+      document.getElementById('kpiTotalExpense').textContent = formatCurrency(totalExpense);
+      document.getElementById('kpiExpenseCount').textContent = `${expenseCount} รายการถอนออก`;
+      document.getElementById('kpiNetCashflow').textContent = (netCashFlow >= 0 ? '+' : '') + formatCurrency(netCashFlow);
+      document.getElementById('kpiTransferCount').textContent = `โอนย้ายภายใน: ${transferCount} รายการ (${formatCurrency(totalTransfer)})`;
+
+      const badge = document.getElementById('validationBadge');
+      const pill = document.getElementById('reconStatusPill');
+      if (flaggedItems.length > 0) {
+        badge.textContent = flaggedItems.length;
+        badge.classList.remove('hidden');
+        pill.textContent = `รอตรวจสอบ (${flaggedItems.length})`;
+        pill.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200';
+      } else {
+        badge.classList.add('hidden');
+        pill.textContent = 'Reconciled (ตรง)';
+        pill.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200';
+      }
+
+      renderRegisterTable(enriched);
+      renderMonthlySummary(enriched, totalIncome, totalExpense);
+      renderValidationView(enriched, totalIncome, totalExpense, totalTransfer, latestBalance);
+      renderCondoView();
+    }
+
+    function simulatePayoff(remainingPrincipal, annualRate, monthlyInstallment, extraMonthly) {
+      let bal = Number(remainingPrincipal);
+      const rMonthly = (Number(annualRate) / 100) / 12;
+      const pmt = Number(monthlyInstallment) + Number(extraMonthly);
+      let months = 0;
+      let totalFutureInterest = 0;
+
+      if (bal <= 0) return { months: 0, totalFutureInterest: 0, feasible: true };
+      if (pmt <= bal * rMonthly) {
+        return { months: 999, totalFutureInterest: 0, feasible: false };
+      }
+
+      while (bal > 0.01 && months < 600) {
+        const interest = bal * rMonthly;
+        totalFutureInterest += interest;
+        const principalCut = pmt - interest;
+        bal = Math.max(0, bal - principalCut);
+        months++;
+      }
+      return { months, totalFutureInterest, feasible: true };
+    }
+
+    function renderCondoView() {
+      // Populate config inputs
+      document.getElementById('condoInputName').value = condoConfig.propertyName || '';
+      document.getElementById('condoInputPrincipal').value = condoConfig.originalPrincipal;
+      document.getElementById('condoInputRate').value = condoConfig.annualRate;
+      document.getElementById('condoInputMonthlyPmt').value = condoConfig.monthlyInstallment;
+      document.getElementById('condoInputExtraSim').value = condoConfig.extraMonthlySim;
+      document.getElementById('condoInputTenureYears').value = condoConfig.tenureYears;
+      document.getElementById('condoInputStartDate').value = condoConfig.startDate;
+      document.getElementById('condoHeaderTitle').textContent = `โครงการ: ${condoConfig.propertyName} | ดอกเบี้ยปัจจุบัน ${Number(condoConfig.annualRate).toFixed(2)}% ต่อปี`;
+
+      // Sort payments chronologically
+      const sortedPmts = [...condoPayments].sort((a, b) => a.date.localeCompare(b.date));
+      let balance = Number(condoConfig.originalPrincipal);
+      let totalPaid = 0;
+      let totalInterestPaid = 0;
+      let totalPrincipalPaid = 0;
+      let totalExtraPaid = 0;
+
+      const enrichedCondo = sortedPmts.map((p, idx) => {
+        const rate = Number(p.rate || condoConfig.annualRate);
+        const days = Number(p.days ?? 30);
+        const reg = Number(p.regularAmount || 0);
+        const ext = Number(p.extraAmount || 0);
+        const totalPayment = reg + ext;
+
+        const calcInt = Number(((balance * (rate / 100) * days) / 365).toFixed(2));
+        const interestPart = (p.customInterest !== null && p.customInterest !== undefined && p.customInterest !== '')
+          ? Number(p.customInterest)
+          : calcInt;
+        const principalPart = Math.max(0, Number((totalPayment - interestPart).toFixed(2)));
+        balance = Math.max(0, Number((balance - principalPart).toFixed(2)));
+
+        totalPaid += totalPayment;
+        totalInterestPaid += interestPart;
+        totalPrincipalPaid += principalPart;
+        totalExtraPaid += ext;
+
+        return {
+          ...p,
+          periodNo: idx + 1,
+          rate,
+          days,
+          totalPayment,
+          interestPart,
+          principalPart,
+          extraPart: ext,
+          remainingBalance: balance
+        };
+      });
+
+      const pctPaid = condoConfig.originalPrincipal > 0
+        ? Math.min(100, ((condoConfig.originalPrincipal - balance) / condoConfig.originalPrincipal) * 100)
+        : 0;
+      const nextMonthInterest = Number(((balance * (Number(condoConfig.annualRate) / 100) * 30) / 365).toFixed(2));
+
+      // Update Condo KPIs
+      document.getElementById('condoKpiRemaining').textContent = formatCurrency(balance);
+      document.getElementById('condoProgressBadge').textContent = `ชำระต้นแล้ว ${pctPaid.toFixed(1)}%`;
+      document.getElementById('condoProgressBar').style.width = `${pctPaid.toFixed(1)}%`;
+      document.getElementById('condoKpiOriginalLoan').textContent = `วงเงินกู้เริ่มต้น: ${formatCurrency(condoConfig.originalPrincipal)}`;
+
+      document.getElementById('condoKpiTotalPaid').textContent = formatCurrency(totalPaid);
+      document.getElementById('condoKpiPrincipalPaid').textContent = `${formatCurrency(totalPrincipalPaid)} (รวมโปะ ${formatCurrency(totalExtraPaid)})`;
+
+      document.getElementById('condoKpiInterestPaid').textContent = formatCurrency(totalInterestPaid);
+      document.getElementById('condoKpiNextInterestEst').textContent = `ดอกเบี้ยงวดถัดไป (30 วัน): ~${formatCurrency(nextMonthInterest)}`;
+
+      // Payoff simulations
+      const simNormal = simulatePayoff(balance, condoConfig.annualRate, condoConfig.monthlyInstallment, 0);
+      const simWithExtra = simulatePayoff(balance, condoConfig.annualRate, condoConfig.monthlyInstallment, condoConfig.extraMonthlySim);
+
+      if (simWithExtra.feasible) {
+        const yrs = Math.floor(simWithExtra.months / 12);
+        const mos = simWithExtra.months % 12;
+        document.getElementById('condoKpiPayoffEst').textContent = `${yrs} ปี ${mos} เดือน (${simWithExtra.months} งวด)`;
+      } else {
+        document.getElementById('condoKpiPayoffEst').textContent = 'ค่างวดต่ำกว่าดอกเบี้ย';
+      }
+
+      const paidCount = enrichedCondo.length;
+      const refinanceLeft = Math.max(0, 36 - paidCount);
+      document.getElementById('condoKpiRefinanceInfo').textContent = refinanceLeft > 0
+        ? `ส่งแล้ว ${paidCount} งวด | อีก ${refinanceLeft} งวดครบ 3 ปี (รีไฟแนนซ์)`
+        : `ส่งแล้ว ${paidCount} งวด (ครบเกณฑ์ 3 ปี รีไฟแนนซ์/ขอลดดอกเบี้ยได้)`;
+
+      // Update Simulator Banner
+      if (simNormal.feasible) {
+        const ny = Math.floor(simNormal.months / 12);
+        const nm = simNormal.months % 12;
+        document.getElementById('simNormalSummary').textContent = `เหลืออีก ${ny} ปี ${nm} เดือน | ดอกเบี้ยในอนาคต ${formatCurrency(simNormal.totalFutureInterest)}`;
+      } else {
+        document.getElementById('simNormalSummary').textContent = 'ค่างวดปัจจุบันไม่พอตัดดอกเบี้ยรายเดือน';
+      }
+
+      document.getElementById('simExtraLabel').textContent = `กรณีโปะเพิ่มเดือนละ +${formatCurrency(condoConfig.extraMonthlySim)} (รวมจ่าย ${formatCurrency(Number(condoConfig.monthlyInstallment) + Number(condoConfig.extraMonthlySim))}/เดือน)`;
+      if (simWithExtra.feasible) {
+        const ey = Math.floor(simWithExtra.months / 12);
+        const em = simWithExtra.months % 12;
+        const savedInterest = Math.max(0, simNormal.totalFutureInterest - simWithExtra.totalFutureInterest);
+        const savedMonths = Math.max(0, simNormal.months - simWithExtra.months);
+        document.getElementById('simExtraSummary').textContent = `เหลืออีก ${ey} ปี ${em} เดือน (เร็วขึ้น ${(savedMonths / 12).toFixed(1)} ปี) | ดอกเบี้ย ${formatCurrency(simWithExtra.totalFutureInterest)}`;
+        document.getElementById('condoInterestSavedBadge').textContent = `ประหยัดดอกเบี้ยได้ ${formatCurrency(savedInterest)}`;
+      }
+
+      // Render Table
+      document.getElementById('condoTableCount').textContent = `บันทึกแล้ว ${enrichedCondo.length} งวด`;
+      const tbody = document.getElementById('condoTableBody');
+      tbody.innerHTML = '';
+
+      if (enrichedCondo.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="11" class="py-8 text-center text-slate-400">ยังไม่มีประวัติการชำระค่างวดคอนโด</td></tr>`;
+      } else {
+        enrichedCondo.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-50/80 transition-colors';
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 font-mono font-semibold text-slate-700">#${item.periodNo}</td>
+            <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-900">${formatDateTH(item.date)}</td>
+            <td class="py-2.5 px-3 text-center font-mono text-slate-500">${item.days}</td>
+            <td class="py-2.5 px-3 text-right font-mono text-slate-600">${item.rate.toFixed(2)}%</td>
+            <td class="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">${formatCurrency(item.totalPayment)}</td>
+            <td class="py-2.5 px-3 text-right font-mono text-rose-600">${formatCurrency(item.interestPart)}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-semibold text-emerald-700">${formatCurrency(item.principalPart)}</td>
+            <td class="py-2.5 px-3 text-right font-mono ${item.extraPart > 0 ? 'text-indigo-600 font-medium' : 'text-slate-300'}">${item.extraPart > 0 ? '+' + formatCurrency(item.extraPart) : '-'}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900">${formatCurrency(item.remainingBalance)}</td>
+            <td class="py-2.5 px-3 text-slate-600 max-w-[180px] truncate" title="${item.note || ''}">${item.note || '-'}</td>
+            <td class="py-2.5 px-3 text-center">
+              <button data-del-condo="${item.id}" class="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 rounded hover:bg-rose-50 transition">ลบ</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        tbody.querySelectorAll('[data-del-condo]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-del-condo');
+            condoPayments = condoPayments.filter(p => p.id !== id);
+            saveData();
+            renderAll();
+          });
+        });
+      }
+
+      // Render Condo Stacked Bar Chart (Principal Cut vs Interest Paid per Installment)
+      const ctx = document.getElementById('condoChart').getContext('2d');
+      if (condoChartInstance) {
+        condoChartInstance.destroy();
+      }
+      condoChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: enrichedCondo.map(i => `งวด #${i.periodNo} (${formatDateTH(i.date).slice(0, 5)})`),
+          datasets: [
+            {
+              label: 'ตัดเงินต้นสุทธิ (Principal)',
+              data: enrichedCondo.map(i => i.principalPart),
+              backgroundColor: '#10b981',
+              borderRadius: 4
+            },
+            {
+              label: 'ดอกเบี้ย (Interest)',
+              data: enrichedCondo.map(i => i.interestPart),
+              backgroundColor: '#f43f5e',
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true }
+          },
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+          }
+        }
+      });
+    }
+
+    const CATEGORY_OPTIONS = [
+      'รอระบุหมวดหมู่',
+      'ชำระค่างวดคอนโด',
+      'รายได้จากการขาย/บริการ',
+      'รายได้ดอกเบี้ย',
+      'เงินคืน/เงินชดเชย',
+      'ต้นทุนสินค้า/บริการ',
+      'ค่าใช้จ่ายดำเนินงาน',
+      'ค่าสาธารณูปโภค',
+      'เงินเดือนและค่าจ้าง',
+      'ค่าธรรมเนียมธนาคาร',
+      'ภาษี',
+      'ค่าใช้จ่ายส่วนตัว',
+      'โอนย้ายระหว่างบัญชี'
+    ];
+
+    function renderRegisterTable(enriched) {
+      const search = (document.getElementById('filterSearch').value || '').toLowerCase();
+      const typeFilter = document.getElementById('filterType').value;
+
+      const filtered = enriched.filter(item => {
+        const matchType =
+          typeFilter === 'all' ? true :
+          typeFilter === 'uncategorized' ? item.category === 'รอระบุหมวดหมู่' :
+          item.type === typeFilter;
+        const textBlob = `${item.description} ${item.referenceNo} ${item.category} ${item.subCategory} ${item.bankAccount} ${item.note}`.toLowerCase();
+        const matchSearch = !search || textBlob.includes(search);
+        return matchType && matchSearch;
+      });
+
+      document.getElementById('registerCountLabel').textContent = `แสดง ${filtered.length} จาก ${enriched.length} รายการ (คลิกแก้ไขที่มา/หมวดหมู่ในตารางได้ทันที)`;
+
+      const tbody = document.getElementById('registerTableBody');
+      tbody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="11" class="py-8 text-center text-slate-400">ไม่พบรายการธุรกรรมที่ค้นหา</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(item => {
+        const tr = document.createElement('tr');
+        const isUncat = item.category === 'รอระบุหมวดหมู่';
+        tr.className = isUncat ? 'bg-amber-50/40 hover:bg-amber-50/70 transition-colors' : 'hover:bg-slate-50/80 transition-colors';
+
+        const catOptionsHtml = CATEGORY_OPTIONS.map(c =>
+          `<option value="${c}" ${item.category === c ? 'selected' : ''}>${c === 'รอระบุหมวดหมู่' ? '⚠️ รอระบุหมวดหมู่' : c}</option>`
+        ).join('');
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-mono text-slate-400">${item.no}</td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="font-medium text-slate-900">${formatDateTH(item.date)}</div>
+            <div class="text-[11px] text-slate-400 font-mono">${item.time}</div>
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="font-medium text-slate-700">${item.bankAccount}</div>
+            <div class="text-[11px] font-mono text-slate-400">${item.referenceNo || '-'}</div>
+          </td>
+          <td class="py-2.5 px-3 min-w-[230px]">
+            <input type="text" data-edit-field="description" data-id="${item.id}" value="${(item.description || '').replace(/"/g, '&quot;')}" placeholder="ระบุว่าเงินมาจากไหน / ใช้ทำอะไร..." class="w-full rounded-lg border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent px-2 py-1 text-xs font-medium text-slate-900 focus:outline-none transition" />
+            <div class="text-[10px] text-slate-400 px-2">${item.channel || 'Bank Statement'}</div>
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <select data-edit-field="type" data-id="${item.id}" class="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium ${item.type === 'income' ? 'bg-emerald-50 text-emerald-700' : item.type === 'expense' ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-700'}">
+              <option value="income" ${item.type === 'income' ? 'selected' : ''}>รายรับ</option>
+              <option value="expense" ${item.type === 'expense' ? 'selected' : ''}>รายจ่าย</option>
+              <option value="transfer" ${item.type === 'transfer' ? 'selected' : ''}>โอนย้าย</option>
+            </select>
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap min-w-[175px]">
+            <select data-edit-field="category" data-id="${item.id}" class="w-full rounded-lg border ${isUncat ? 'border-amber-300 bg-amber-50 text-amber-800 font-semibold' : 'border-slate-200 bg-white text-slate-800'} px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
+              ${catOptionsHtml}
+            </select>
+          </td>
+          <td class="py-2.5 px-3 text-right font-mono font-medium ${item.incomeVal > 0 ? 'text-emerald-600' : 'text-slate-300'}">
+            ${item.incomeVal.toLocaleString('en-US', {minimumFractionDigits: 2})}
+          </td>
+          <td class="py-2.5 px-3 text-right font-mono font-medium ${item.expenseVal > 0 ? 'text-rose-600' : 'text-slate-300'}">
+            ${item.expenseVal.toLocaleString('en-US', {minimumFractionDigits: 2})}
+          </td>
+          <td class="py-2.5 px-3 text-right font-mono font-semibold ${Math.abs(item.diff) >= 0.01 ? 'text-rose-600 underline' : 'text-slate-900'}">
+            ${item.runningBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}
+          </td>
+          <td class="py-2.5 px-3 min-w-[160px]">
+            <input type="text" data-edit-field="note" data-id="${item.id}" value="${(item.note || '').replace(/"/g, '&quot;')}" placeholder="+ เพิ่มหมายเหตุ / ชื่อผู้รับ..." class="w-full rounded-lg border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:bg-white bg-transparent px-2 py-1 text-xs text-slate-700 focus:outline-none transition" />
+            <div class="text-[10px] text-slate-400 px-2 truncate">${item.sourceFile || '-'}</div>
+          </td>
+          <td class="py-2.5 px-3 text-center">
+            <button data-delete-id="${item.id}" class="text-slate-400 hover:text-rose-600 text-xs px-2 py-1 rounded hover:bg-rose-50 transition">ลบ</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Bind inline edits
+      tbody.querySelectorAll('[data-edit-field]').forEach(el => {
+        el.addEventListener('change', () => {
+          const id = el.getAttribute('data-id');
+          const field = el.getAttribute('data-edit-field');
+          const target = transactions.find(t => t.id === id);
+          if (target) {
+            target[field] = el.value;
+            saveData();
+            renderAll();
+          }
+        });
+      });
+
+      tbody.querySelectorAll('[data-delete-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-delete-id');
+          transactions = transactions.filter(t => t.id !== id);
+          saveData();
+          renderAll();
+        });
+      });
+    }
+
+    function renderMonthlySummary(enriched, totalIncome, totalExpense) {
+      const map = {};
+      enriched.forEach(item => {
+        if (item.type === 'transfer') return;
+        const key = `${item.type}__${item.category}`;
+        if (!map[key]) {
+          map[key] = { category: item.category, type: item.type, count: 0, total: 0 };
+        }
+        map[key].count++;
+        map[key].total += Number(item.amount);
+      });
+
+      const rows = Object.values(map).sort((a, b) => b.total - a.total);
+      const tbody = document.getElementById('categorySummaryBody');
+      tbody.innerHTML = '';
+
+      rows.forEach(r => {
+        const baseTotal = r.type === 'income' ? totalIncome : totalExpense;
+        const pct = baseTotal > 0 ? ((r.total / baseTotal) * 100).toFixed(1) : '0.0';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-medium text-slate-900">${r.category}</td>
+          <td class="py-2.5 px-3">${r.type === 'income' ? '<span class="text-emerald-600 font-medium">รายรับ</span>' : '<span class="text-rose-600 font-medium">รายจ่าย</span>'}</td>
+          <td class="py-2.5 px-3 text-right font-mono">${r.count}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-semibold">${formatCurrency(r.total)}</td>
+          <td class="py-2.5 px-3 text-right font-mono text-slate-500">${pct}%</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const ctx = document.getElementById('summaryChart').getContext('2d');
+      if (summaryChartInstance) {
+        summaryChartInstance.destroy();
+      }
+      summaryChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: rows.map(r => r.category),
+          datasets: [{
+            label: 'ยอดรวมตามหมวดหมู่ (THB)',
+            data: rows.map(r => r.total),
+            backgroundColor: rows.map(r => r.type === 'income' ? '#10b981' : '#f43f5e'),
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    function renderValidationView(enriched, totalIncome, totalExpense, totalTransfer, latestBalance) {
+      const expectedEnding = Number((openingBalance + totalIncome - totalExpense - totalTransfer).toFixed(2));
+      const periodDiff = Number((latestBalance - expectedEnding).toFixed(2));
+
+      const cardsContainer = document.getElementById('reconFormulaCards');
+      cardsContainer.innerHTML = `
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="text-slate-400 text-[11px]">1. ยอดยกมาต้นงวด (Opening)</div>
+          <div class="text-base font-bold text-slate-900 mt-1">${formatCurrency(openingBalance)}</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200">
+          <div class="text-emerald-700 text-[11px]">2. บวก รายรับรวม (+Income)</div>
+          <div class="text-base font-bold text-emerald-700 mt-1">+${formatCurrency(totalIncome)}</div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-rose-50/60 border border-rose-200">
+          <div class="text-rose-700 text-[11px]">3. หัก รายจ่าย & โอนออก (-Outflow)</div>
+          <div class="text-base font-bold text-rose-700 mt-1">-${formatCurrency(totalExpense + totalTransfer)}</div>
+        </div>
+        <div class="p-3.5 rounded-xl ${Math.abs(periodDiff) < 0.01 ? 'bg-emerald-50 border-emerald-300' : 'bg-amber-50 border-amber-300'} border">
+          <div class="text-slate-600 text-[11px]">4. ยอดยกไปสิ้นงวด (Ending Check)</div>
+          <div class="text-base font-bold text-slate-900 mt-1">${formatCurrency(latestBalance)} <span class="text-xs font-normal">(${Math.abs(periodDiff) < 0.01 ? 'ตรง 0.00' : 'ผลต่าง ' + periodDiff})</span></div>
+        </div>
+      `;
+
+      const vBody = document.getElementById('validationTableBody');
+      vBody.innerHTML = '';
+
+      enriched.forEach(item => {
+        const tr = document.createElement('tr');
+        const statusStyle = item.status === 'OK'
+          ? 'bg-emerald-50 text-emerald-700'
+          : item.status === 'รอระบุหมวดหมู่'
+          ? 'bg-amber-50 text-amber-700'
+          : 'bg-rose-50 text-rose-700';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-mono">${item.no}</td>
+          <td class="py-2.5 px-3">${formatDateTH(item.date)} ${item.time}</td>
+          <td class="py-2.5 px-3 text-slate-500">${item.sourceFile || '-'}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-900">${item.referenceNo ? '[' + item.referenceNo + '] ' : ''}${item.description}</td>
+          <td class="py-2.5 px-3 text-right font-mono">${item.runningBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+          <td class="py-2.5 px-3 text-right font-mono">${item.expectedBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-semibold ${Math.abs(item.diff) >= 0.01 ? 'text-rose-600' : 'text-slate-400'}">${item.diff.toFixed(2)}</td>
+          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-md font-medium text-[11px] ${statusStyle}">${item.status}</span></td>
+          <td class="py-2.5 px-3">${item.confidence}</td>
+          <td class="py-2.5 px-3 text-slate-600">${item.remark}</td>
+        `;
+        vBody.appendChild(tr);
+      });
+    }
+
+    // Event Listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('inputDate').value = '2026-10-25';
+      loadData();
+      renderAll();
+
+      // Tabs
+      const tabs = [
+        { btn: 'tabBtnRegister', view: 'viewRegister' },
+        { btn: 'tabBtnSummary', view: 'viewSummary' },
+        { btn: 'tabBtnValidation', view: 'viewValidation' },
+        { btn: 'tabBtnCondo', view: 'viewCondo' }
+      ];
+      tabs.forEach(t => {
+        document.getElementById(t.btn).addEventListener('click', () => {
+          tabs.forEach(other => {
+            document.getElementById(other.view).classList.add('hidden');
+            document.getElementById(other.btn).className = 'px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-1.5';
+          });
+          document.getElementById(t.view).classList.remove('hidden');
+          document.getElementById(t.btn).className = 'px-3 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm transition-all flex items-center gap-1.5';
+          renderAll();
+        });
+      });
+
+      // Form Submit
+      document.getElementById('txnForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const amt = parseFloat(document.getElementById('inputAmount').value);
+        if (isNaN(amt) || amt <= 0) return;
+
+        const stmtBalRaw = document.getElementById('inputStmtBal').value;
+        const newTxn = {
+          id: 'txn-' + Date.now(),
+          date: document.getElementById('inputDate').value,
+          time: document.getElementById('inputTime').value || '00:00',
+          bankAccount: document.getElementById('inputBank').value.trim() || 'KBANK-4821',
+          referenceNo: document.getElementById('inputRef').value.trim() || '-',
+          description: document.getElementById('inputDesc').value.trim(),
+          type: document.getElementById('inputType').value,
+          category: document.getElementById('inputCategory').value,
+          subCategory: document.getElementById('inputSubCategory').value.trim() || '-',
+          amount: amt,
+          statementBalance: stmtBalRaw !== '' ? parseFloat(stmtBalRaw) : null,
+          channel: 'Bank Statement / Slip',
+          note: document.getElementById('inputNote').value.trim(),
+          sourceFile: document.getElementById('inputSource').value.trim() || 'Manual Entry'
+        };
+
+        transactions.push(newTxn);
+        saveData();
+        renderAll();
+        document.getElementById('inputAmount').value = '';
+        document.getElementById('inputDesc').value = '';
+        document.getElementById('inputRef').value = '';
+        document.getElementById('inputStmtBal').value = '';
+        document.getElementById('inputNote').value = '';
+      });
+
+      // Filters
+      document.getElementById('filterSearch').addEventListener('input', () => renderAll());
+      document.getElementById('filterType').addEventListener('change', () => renderAll());
+
+      // Opening Balance Modal
+      const modal = document.getElementById('modalOpening');
+      document.getElementById('btnEditOpening').addEventListener('click', () => {
+        document.getElementById('modalOpeningInput').value = openingBalance;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      });
+      document.getElementById('btnCancelOpening').addEventListener('click', () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      });
+      document.getElementById('btnSaveOpening').addEventListener('click', () => {
+        const val = parseFloat(document.getElementById('modalOpeningInput').value);
+        if (!isNaN(val)) {
+          openingBalance = val;
+          saveData();
+          renderAll();
+        }
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      });
+
+      // Reset Demo
+      document.getElementById('btnResetDemo').addEventListener('click', () => {
+        transactions = [...DEFAULT_TRANSACTIONS];
+        openingBalance = DEFAULT_OPENING_BALANCE;
+        condoConfig = { ...DEFAULT_CONDO_CONFIG };
+        condoPayments = [...DEFAULT_CONDO_PAYMENTS];
+        saveData();
+        renderAll();
+      });
+
+      // Condo Config Form Submit
+      document.getElementById('condoConfigForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        condoConfig = {
+          propertyName: document.getElementById('condoInputName').value.trim() || 'Condo Loan',
+          originalPrincipal: parseFloat(document.getElementById('condoInputPrincipal').value) || 2500000,
+          annualRate: parseFloat(document.getElementById('condoInputRate').value) || 3.45,
+          monthlyInstallment: parseFloat(document.getElementById('condoInputMonthlyPmt').value) || 12500,
+          extraMonthlySim: parseFloat(document.getElementById('condoInputExtraSim').value) || 0,
+          tenureYears: parseInt(document.getElementById('condoInputTenureYears').value, 10) || 30,
+          startDate: document.getElementById('condoInputStartDate').value || '2026-07-01'
+        };
+        document.getElementById('condoPayRegular').value = condoConfig.monthlyInstallment;
+        document.getElementById('condoPayRate').value = condoConfig.annualRate;
+        saveData();
+        renderAll();
+      });
+
+      // Condo Payment Form Submit
+      document.getElementById('condoPayForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const payDate = document.getElementById('condoPayDate').value || '2026-10-25';
+        const days = parseInt(document.getElementById('condoPayDays').value, 10) || 30;
+        const regAmt = parseFloat(document.getElementById('condoPayRegular').value) || 0;
+        const extAmt = parseFloat(document.getElementById('condoPayExtra').value) || 0;
+        const rate = parseFloat(document.getElementById('condoPayRate').value) || condoConfig.annualRate;
+        const customIntRaw = document.getElementById('condoPayCustomInterest').value;
+        const note = document.getElementById('condoPayNote').value.trim() || 'ชำระค่างวดคอนโดรายเดือน';
+        const syncReg = document.getElementById('condoSyncToRegister').checked;
+
+        if (regAmt + extAmt <= 0) return;
+
+        const newPmt = {
+          id: 'cp-' + Date.now(),
+          date: payDate,
+          days,
+          rate,
+          regularAmount: regAmt,
+          extraAmount: extAmt,
+          customInterest: customIntRaw !== '' ? parseFloat(customIntRaw) : null,
+          note
+        };
+        condoPayments.push(newPmt);
+
+        if (syncReg) {
+          transactions.push({
+            id: 'txn-condo-' + Date.now(),
+            date: payDate,
+            time: '10:00',
+            bankAccount: 'KBANK-4821',
+            referenceNo: 'MTG-' + (condoPayments.length),
+            description: `ชำระค่างวดคอนโด (${condoConfig.propertyName})${extAmt > 0 ? ' + โปะเพิ่ม ฿' + extAmt.toLocaleString() : ''}`,
+            type: 'expense',
+            category: 'ชำระค่างวดคอนโด',
+            subCategory: extAmt > 0 ? 'ค่างวดปกติ + โปะตัดต้น' : 'ค่างวดปกติ',
+            amount: regAmt + extAmt,
+            statementBalance: null,
+            channel: 'Direct Debit / App',
+            note,
+            sourceFile: 'Condo Mortgage Tracker'
+          });
+        }
+
+        saveData();
+        renderAll();
+        document.getElementById('condoPayExtra').value = '0';
+        document.getElementById('condoPayCustomInterest').value = '';
+        document.getElementById('condoPayNote').value = '';
+      });
+
+      // Statement Import Modal & Parser
+      const importModal = document.getElementById('modalImportStmt');
+      document.getElementById('btnOpenImportModal').addEventListener('click', () => {
+        importModal.classList.remove('hidden');
+        importModal.classList.add('flex');
+      });
+      document.getElementById('btnCancelImport').addEventListener('click', () => {
+        importModal.classList.add('hidden');
+        importModal.classList.remove('flex');
+      });
+      document.getElementById('btnLoadSampleStmt').addEventListener('click', () => {
+        document.getElementById('importRawText').value = [
+          '10/10/2026 10:15 | QR-88412 | รับโอนเงินผ่าน QR PromptPay | +12,500.00 | 81,400.00',
+          '12/10/2026 13:40 | POS-39201 | ชำระค่าสินค้าผ่านบัตรเดบิต | -1,450.00 | 79,950.00',
+          '14/10/2026 16:05 | X1-77410 | โอนเงินออกผ่าน K PLUS | -3,200.00 | 76,750.00',
+          '18/10/2026 09:30 | ATS-55190 | หักบัญชีอัตโนมัติประจำเดือน | -890.00 | 75,860.00'
+        ].join('\n');
+      });
+
+      document.getElementById('btnConfirmImport').addEventListener('click', () => {
+        const raw = document.getElementById('importRawText').value.trim();
+        if (!raw) return;
+        const bankAcc = document.getElementById('importBankAccount').value.trim() || 'KBANK-4821';
+        const srcFile = document.getElementById('importSourceFile').value.trim() || 'Pasted_Statement';
+        const replaceAll = document.getElementById('importClearExisting').checked;
+
+        const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const parsedRows = [];
+
+        lines.forEach((line, idx) => {
+          // Match date DD/MM/YYYY or YYYY-MM-DD
+          const dateMatch = line.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/);
+          if (!dateMatch) return;
+
+          let rawDate = dateMatch[1];
+          let isoDate = '2026-10-25';
+          if (/^\d{4}/.test(rawDate)) {
+            isoDate = rawDate.replace(/\//g, '-');
+          } else {
+            const dp = rawDate.split(/[\/\-]/);
+            let yr = parseInt(dp[2], 10);
+            if (yr > 2400) yr -= 543; // Convert Thai Buddhist Year (พ.ศ.) to ค.ศ.
+            isoDate = `${yr}-${dp[1].padStart(2, '0')}-${dp[0].padStart(2, '0')}`;
+          }
+
+          const timeMatch = line.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
+          const timeStr = timeMatch ? timeMatch[1].slice(0, 5) : '00:00';
+
+          // Split by pipe, tab, or multiple spaces
+          const parts = line.includes('|')
+            ? line.split('|').map(p => p.trim())
+            : line.includes('\t')
+            ? line.split('\t').map(p => p.trim())
+            : line.split(/\s{2,}/).map(p => p.trim());
+
+          // Extract numeric monetary tokens
+          const numRegex = /([+\-]?\d{1,3}(?:,\d{3})*(?:\.\d{2})|[+\-]?\d+\.\d{2})/g;
+          const nums = [];
+          let m;
+          while ((m = numRegex.exec(line)) !== null) {
+            nums.push(m[1]);
+          }
+          if (nums.length === 0) return;
+
+          let amtToken = nums.length >= 2 ? nums[nums.length - 2] : nums[0];
+          let balToken = nums.length >= 2 ? nums[nums.length - 1] : null;
+
+          const rawVal = parseFloat(amtToken.replace(/,/g, ''));
+          const stmtBal = balToken ? parseFloat(balToken.replace(/,/g, '')) : null;
+
+          // Determine income vs expense from sign or keywords
+          let txnType = 'expense';
+          if (amtToken.startsWith('+') || /รับโอน|ฝาก|เงินเข้า|credit|deposit/i.test(line)) {
+            txnType = 'income';
+          } else if (/บัญชีตนเอง|โอนย้ายภายใน/i.test(line)) {
+            txnType = 'transfer';
+          }
+
+          let refCode = 'STMT-' + (idx + 1);
+          let desc = line;
+          if (parts.length >= 3) {
+            refCode = parts[1] || refCode;
+            desc = parts[2] || line;
+          } else {
+            // Strip date, time, and numbers to leave clean description
+            desc = line
+              .replace(dateMatch[0], '')
+              .replace(timeStr, '')
+              .replace(amtToken, '')
+              .replace(balToken || '', '')
+              .replace(/[|\t]+/g, ' ')
+              .trim() || 'รายการจากสเตทเมนต์ (รอกรอกรายละเอียด)';
+          }
+
+          parsedRows.push({
+            id: 'stmt-' + Date.now() + '-' + idx,
+            date: isoDate,
+            time: timeStr,
+            bankAccount: bankAcc,
+            referenceNo: refCode,
+            description: desc,
+            type: txnType,
+            category: 'รอระบุหมวดหมู่',
+            subCategory: 'รอกรอกที่มา/วัตถุประสงค์',
+            amount: Math.abs(rawVal),
+            statementBalance: stmtBal,
+            channel: 'Pasted Statement',
+            note: '',
+            sourceFile: srcFile
+          });
+        });
+
+        if (parsedRows.length > 0) {
+          if (replaceAll) {
+            transactions = parsedRows;
+          } else {
+            transactions.push(...parsedRows);
+          }
+          saveData();
+          renderAll();
+          document.getElementById('importRawText').value = '';
+          importModal.classList.add('hidden');
+          importModal.classList.remove('flex');
+        }
+      });
+
+      // Export CSV
+      document.getElementById('btnExportCsv').addEventListener('click', () => {
+        const enriched = computeEnrichedTransactions();
+        const headers = ['No','Date','Time','Bank_Account','Ref_Code','Description','Type','Main_Category','Sub_Category','Income','Expense','Running_Balance','Channel','Note','Source_File'];
+        const csvRows = [headers.join(',')];
+        enriched.forEach(r => {
+          const row = [
+            r.no,
+            formatDateTH(r.date),
+            r.time,
+            `"${r.bankAccount}"`,
+            `"${r.referenceNo}"`,
+            `"${(r.description || '').replace(/"/g, '""')}"`,
+            r.type,
+            `"${r.category}"`,
+            `"${r.subCategory}"`,
+            r.incomeVal.toFixed(2),
+            r.expenseVal.toFixed(2),
+            r.runningBalance.toFixed(2),
+            `"${r.channel}"`,
+            `"${(r.note || '').replace(/"/g, '""')}"`,
+            `"${r.sourceFile}"`
+          ];
+          csvRows.push(row.join(','));
+        });
+        const blob = new Blob(["\uFEFF" + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Cashflow_Income_Expense_Register.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+    });
+  </script>
+</body>
+</html>
